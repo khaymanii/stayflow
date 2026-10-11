@@ -1,4 +1,3 @@
-```python
 import os
 from collections.abc import Generator
 
@@ -31,4 +30,3 @@ def get_db() -> Generator[Session, None, None]:
         yield db
     finally:
         db.close()
-```

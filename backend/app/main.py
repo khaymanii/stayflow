@@ -1,9 +1,14 @@
-from fastapi import Depends, FastAPI, HTTPException
-from sqlalchemy import text
+from fastapi import Depends, FastAPI, HTTPException, status
+from sqlalchemy import select, text
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.schemas.reservation import ReservationOverlapRequest
+from app.models.reservation import Reservation
+from app.schemas.reservation import (
+    ReservationCreate,
+    ReservationOverlapRequest,
+    ReservationResponse,
+)
 from app.services.reservation_service import reservations_overlap
 
 app = FastAPI(title="StayFlow API")
@@ -17,21 +22,65 @@ def health_check():
 @app.get("/db/health")
 def database_health_check(db: Session = Depends(get_db)):
     db.execute(text("SELECT 1"))
-
     return {"database": "connected"}
+
+
+@app.post(
+    "/reservations",
+    response_model=ReservationResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+def create_reservation(
+    request: ReservationCreate,
+    db: Session = Depends(get_db),
+):
+    # 1. Validate the requested dates
+    if request.check_in >= request.check_out:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Check-in must be before check-out.",
+        )
+
+    # 2. Search for an existing reservation that overlaps
+    statement = select(Reservation).where(
+        Reservation.check_in < request.check_out,
+        Reservation.check_out > request.check_in,
+    )
+
+    existing_reservation = db.scalars(statement).first()
+
+    # 3. Reject conflicting dates
+    if existing_reservation:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="These dates conflict with an existing reservation.",
+        )
+
+    # 4. Create the reservation
+    reservation = Reservation(
+        check_in=request.check_in,
+        check_out=request.check_out,
+    )
+
+    db.add(reservation)
+    db.commit()
+    db.refresh(reservation)
+
+    # 5. Return the saved record
+    return reservation
 
 
 @app.post("/reservations/check-overlap")
 def check_reservation_overlap(request: ReservationOverlapRequest):
     if request.new_check_in >= request.new_check_out:
         raise HTTPException(
-            status_code=400,
+            status_code=status.HTTP_400_BAD_REQUEST,
             detail="Check-in must be before check-out.",
         )
 
     if request.existing_check_in >= request.existing_check_out:
         raise HTTPException(
-            status_code=400,
+            status_code=status.HTTP_400_BAD_REQUEST,
             detail="Existing check-in must be before check-out.",
         )
 

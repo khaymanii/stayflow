@@ -1,7 +1,20 @@
+from datetime import date, datetime
 
-from datetime import date
+from pydantic import BaseModel, ConfigDict
 
-from pydantic import BaseModel
+
+class ReservationCreate(BaseModel):
+    check_in: date
+    check_out: date
+
+
+class ReservationResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    check_in: date
+    check_out: date
+    created_at: datetime
 
 
 class ReservationOverlapRequest(BaseModel):
