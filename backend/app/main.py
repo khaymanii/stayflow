@@ -1,6 +1,8 @@
+from fastapi import Depends, FastAPI, HTTPException
+from sqlalchemy import text
+from sqlalchemy.orm import Session
 
-from fastapi import FastAPI, HTTPException
-
+from app.database import get_db
 from app.schemas.reservation import ReservationOverlapRequest
 from app.services.reservation_service import reservations_overlap
 
@@ -10,6 +12,13 @@ app = FastAPI(title="StayFlow API")
 @app.get("/health")
 def health_check():
     return {"status": "ok"}
+
+
+@app.get("/db/health")
+def database_health_check(db: Session = Depends(get_db)):
+    db.execute(text("SELECT 1"))
+
+    return {"database": "connected"}
 
 
 @app.post("/reservations/check-overlap")
@@ -23,7 +32,7 @@ def check_reservation_overlap(request: ReservationOverlapRequest):
     if request.existing_check_in >= request.existing_check_out:
         raise HTTPException(
             status_code=400,
-            detail="Existing check-in must be before existing check-out.",
+            detail="Existing check-in must be before check-out.",
         )
 
     overlaps = reservations_overlap(
