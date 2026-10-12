@@ -9,6 +9,8 @@ from app.schemas.reservation import (
     ReservationResponse,
 )
 from app.services.reservation_service import reservations_overlap
+from app.models.room import Room
+from app.schemas.room import RoomCreate, RoomResponse
 
 app = FastAPI(title="StayFlow API")
 
