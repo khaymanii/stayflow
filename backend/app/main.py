@@ -35,30 +35,38 @@ def create_reservation(
     request: ReservationCreate,
     db: Session = Depends(get_db),
 ):
-    # 1. Validate the requested dates
     if request.check_in >= request.check_out:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Check-in must be before check-out.",
         )
 
-    # 2. Search for an existing reservation that overlaps
+    # Confirm that the requested room exists.
+    room = db.get(Room, request.room_id)
+
+    if room is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Room not found.",
+        )
+
+    # Look for overlapping reservations in this room only.
     statement = select(Reservation).where(
+        Reservation.room_id == request.room_id,
         Reservation.check_in < request.check_out,
         Reservation.check_out > request.check_in,
     )
 
     existing_reservation = db.scalars(statement).first()
 
-    # 3. Reject conflicting dates
     if existing_reservation:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail="These dates conflict with an existing reservation.",
+            detail="This room is already reserved for those dates.",
         )
 
-    # 4. Create the reservation
     reservation = Reservation(
+        room_id=request.room_id,
         check_in=request.check_in,
         check_out=request.check_out,
     )
@@ -67,9 +75,7 @@ def create_reservation(
     db.commit()
     db.refresh(reservation)
 
-    # 5. Return the saved record
     return reservation
-
 
 @app.post("/reservations/check-overlap")
 def check_reservation_overlap(request: ReservationOverlapRequest):
