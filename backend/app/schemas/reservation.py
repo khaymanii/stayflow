@@ -4,6 +4,7 @@ from pydantic import BaseModel, ConfigDict
 
 
 class ReservationCreate(BaseModel):
+    room_id: int
     check_in: date
     check_out: date
 
