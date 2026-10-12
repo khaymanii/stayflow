@@ -1,7 +1,6 @@
 from fastapi import Depends, FastAPI, HTTPException, status
 from sqlalchemy import select, text
 from sqlalchemy.orm import Session
-
 from app.database import get_db
 from app.models.reservation import Reservation
 from app.schemas.reservation import (
@@ -92,3 +91,57 @@ def check_reservation_overlap(request: ReservationOverlapRequest):
     )
 
     return {"overlaps": overlaps}
+
+
+@app.get(
+    "/reservations",
+    response_model=list[ReservationResponse],
+)
+def list_reservations(
+    db: Session = Depends(get_db),
+):
+    statement = select(Reservation).order_by(Reservation.id)
+    reservations = db.scalars(statement).all()
+
+    return reservations
+
+
+@app.get(
+    "/reservations/{reservation_id}",
+    response_model=ReservationResponse,
+)
+def get_reservation(
+    reservation_id: int,
+    db: Session = Depends(get_db),
+):
+    reservation = db.get(Reservation, reservation_id)
+
+    if reservation is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Reservation not found.",
+        )
+
+    return reservation
+
+
+@app.delete(
+    "/reservations/{reservation_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+)
+def delete_reservation(
+    reservation_id: int,
+    db: Session = Depends(get_db),
+):
+    reservation = db.get(Reservation, reservation_id)
+
+    if reservation is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Reservation not found.",
+        )
+
+    db.delete(reservation)
+    db.commit()
+
+    return None
