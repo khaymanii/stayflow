@@ -147,3 +147,43 @@ def delete_reservation(
     db.commit()
 
     return None
+
+@app.post(
+    "/rooms",
+    response_model=RoomResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+def create_room(
+    request: RoomCreate,
+    db: Session = Depends(get_db),
+):
+    name = request.name.strip()
+
+    if not name:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Room name cannot be empty.",
+        )
+
+    existing_room = db.scalar(
+        select(Room).where(Room.name == name)
+    )
+
+    if existing_room:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="A room with this name already exists.",
+        )
+
+    room = Room(name=name)
+    db.add(room)
+    db.commit()
+    db.refresh(room)
+
+    return room
+
+
+@app.get("/rooms", response_model=list[RoomResponse])
+def list_rooms(db: Session = Depends(get_db)):
+    statement = select(Room).order_by(Room.id)
+    return db.scalars(statement).all()
